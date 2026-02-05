@@ -2,6 +2,7 @@ import sys
 import os
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 
@@ -16,6 +17,15 @@ api_server = FastAPI(
     title="Devils Advocate API",
     description="Deterministic AI Planning Engine with Adversarial Critique",
     version="4.3"
+)
+
+# Enable CORS for Frontend Development (Port 3005)
+api_server.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3005"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # --- 2. Data Models ---
@@ -74,4 +84,4 @@ async def generate_plan(request: PlanRequest):
 
 # --- 4. Execution Entry Point ---
 if __name__ == "__main__":
-    uvicorn.run("src.server:api_server", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("src.server:api_server", host="0.0.0.0", port=8005, reload=True)
