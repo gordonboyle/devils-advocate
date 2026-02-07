@@ -10,14 +10,22 @@ from src.utils.similarity import check_similarity
 from src.utils.gatekeeper import evaluate_plan, GatekeeperResult
 
 # --- 1. Data Contracts (Matches v4.3 Spec) ---
+class Step(BaseModel):
+    step: str
+    description: str
+
+class Risk(BaseModel):
+    risk: str
+    mitigation: str
+
 class ProjectPlan(BaseModel):
     objective: str
     normalized_objective: Optional[str] = None # The Frozen Anchor
     assumptions: List[str]
     constraints: List[str]
-    steps: List[Dict[str, str]]
+    steps: List[Step]
     success_metrics: List[str]
-    risks: List[Dict[str, str]]
+    risks: List[Risk]
     version: int
 
 class Critique(BaseModel):
@@ -40,6 +48,7 @@ class AgentState(TypedDict):
     human_interrupt_active: bool
     human_feedback_text: Optional[str]
     devil_advocate_triggered: bool
+    human_action: Optional[str] # "approve" | "reject"
     status: str
 
 # --- 3. Node Logic ---
@@ -215,7 +224,10 @@ def gatekeeper_node(state: AgentState):
     normalized_obj = plan.normalized_objective
     
     # Convert plan to text for consistency checking
-    plan_text = plan.model_dump_json()
+    # Refined to use semantic fields only (Objective + Step Descriptions)
+    # to avoid JSON noise triggering false drift.
+    step_descriptions = " ".join([s.description for s in plan.steps])
+    plan_text = f"Objective: {plan.objective}. Steps: {step_descriptions}"
     
     result = evaluate_plan(
         critiques=critiques,
@@ -245,6 +257,11 @@ def route_gatekeeper(state: AgentState):
     else:
         return "veto"
 
+def route_after_human(state: AgentState):
+    if state.get("status") == "APPROVED":
+        return "end"
+    return "synthesize"
+
 # --- 5. Graph Construction ---
 workflow = StateGraph(AgentState)
 
@@ -267,6 +284,32 @@ workflow.add_edge("devil_advocate", "synthesize")
 workflow.add_edge("human_injection", "synthesize")
 workflow.add_edge("synthesize", "gatekeeper")
 
-workflow.add_conditional_edges("gatekeeper", route_gatekeeper, { "human_review": END, "draft": "draft", "veto": END })
+workflow.add_conditional_edges("gatekeeper", route_gatekeeper, { "human_review": "human_reaction", "draft": "draft", "veto": END })
 
-app = workflow.compile()
+# Add a dummy node for human_reaction if it doesn't exist, or just route to END if it's the final step.
+# In the spec, Human_Review is a block. We can treat it as a node where we pause.
+# Let's add a placeholder node for Human Reaction/Review so we can interrupt before it.
+
+def human_reaction_node(state: AgentState):
+    print("--- Node: Human Review/Reaction ---")
+    action = state.get("human_action", "reject") # Default to reject/loop if missing
+    
+    if action == "approve":
+        return {"status": "APPROVED"}
+    else:
+        return {"status": "FEEDBACK_LOOP"}
+
+workflow.add_node("human_reaction", human_reaction_node)
+workflow.add_conditional_edges("human_reaction", route_after_human, { "end": END, "synthesize": "synthesize" })
+
+# --- 6. Compilation with Checkpointing ---
+from langgraph.checkpoint.memory import MemorySaver
+
+# Initialize in-memory checkpointer for thread-level persistence
+checkpointer = MemorySaver()
+
+# Compile with interrupt logic
+app = workflow.compile(
+    checkpointer=checkpointer,
+    interrupt_before=["human_reaction"]
+)

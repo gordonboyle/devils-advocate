@@ -11,11 +11,13 @@ import {
   Terminal,
   ShieldAlert,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Play
 } from "lucide-react";
 
 // Types matching backend
 interface PlanResponse {
+  thread_id: string;
   final_plan: {
     objective: string;
     steps: Array<{ step: string; description: string }>;
@@ -26,6 +28,8 @@ interface PlanResponse {
   } | null;
   iteration_count: number;
   status: string;
+  message?: string;
+  next_node?: string;
 }
 
 export default function Home() {
@@ -34,6 +38,10 @@ export default function Home() {
   const [result, setResult] = useState<PlanResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // New state for feedback loop
+  const [feedback, setFeedback] = useState("");
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!objective.trim()) return;
@@ -41,6 +49,8 @@ export default function Home() {
     setLoading(true);
     setResult(null);
     setError(null);
+    setActiveThreadId(null);
+    setFeedback("");
 
     try {
       const res = await fetch("http://localhost:8005/plan", {
@@ -55,16 +65,52 @@ export default function Home() {
 
       const data = await res.json();
       setResult(data);
-    } catch (err: any) {
-      setError(err.message || "Something went wrong connected to the Devils Advocate engine.");
+      if (data.thread_id) {
+        setActiveThreadId(data.thread_id);
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Something went wrong connected to the Devils Advocate engine.";
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFeedback = async (action: "approve" | "reject") => {
+    if (!activeThreadId) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("http://localhost:8005/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thread_id: activeThreadId,
+          action: action,
+          feedback_text: feedback
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+
+      const data = await res.json();
+      setResult(data);
+      // Keep thread_id active just in case
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Error submitting feedback.";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30 font-sans">
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]pointer-events-none" />
+    <main className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30 font-sans pb-20">
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
       <div className="relative max-w-5xl mx-auto px-6 py-20 z-10">
         {/* Header */}
@@ -116,15 +162,15 @@ export default function Home() {
                 onChange={(e) => setObjective(e.target.value)}
                 placeholder="Enter your objective (e.g., 'Build a moon base')..."
                 className="w-full bg-transparent border-none focus:ring-0 text-lg placeholder:text-slate-600 text-white h-12 outline-none"
-                disabled={loading}
+                disabled={loading || (result?.status === "PAUSED")}
               />
               <button
                 type="submit"
-                disabled={loading || !objective}
+                disabled={loading || !objective || (result?.status === "PAUSED")}
                 className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg font-medium transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
               >
-                {loading ? (
-                  <>Running Engine...</>
+                {loading && !result ? (
+                  <>Running...</>
                 ) : (
                   <>Execute <ArrowRight className="w-4 h-4" /></>
                 )}
@@ -155,7 +201,7 @@ export default function Home() {
                 <div className="absolute inset-2 border-t-2 border-red-500 rounded-full animate-spin [animation-direction:reverse]"></div>
               </div>
               <p className="text-slate-400 animate-pulse font-mono">
-                Drafting · Critiquing · Synthesizing...
+                {activeThreadId ? "Processing Feedback..." : "Drafting · Critiquing · Synthesizing..."}
               </p>
             </motion.div>
           )}
@@ -170,6 +216,53 @@ export default function Home() {
           >
             <AlertTriangle className="w-5 h-5" />
             {error}
+          </motion.div>
+        )}
+
+        {/* Human Review Interruption Block */}
+        {result?.status === "PAUSED" && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-3xl mx-auto mt-12 mb-8 bg-amber-500/10 border border-amber-500/20 rounded-xl p-6 ring-1 ring-amber-500/20 shadow-2xl shadow-amber-900/10"
+          >
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-amber-500/20 rounded-lg">
+                <ShieldAlert className="w-6 h-6 text-amber-500" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-amber-400">Human Review Required</h3>
+                <p className="text-amber-200/80 mt-1 mb-4">
+                  The Gatekeeper has paused execution for your review.
+                  Please analyze the generated plan and decide how to proceed.
+                </p>
+
+                <textarea
+                  className="w-full bg-slate-900/50 border border-amber-500/30 rounded-lg p-3 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-amber-500/60 min-h-[100px]"
+                  placeholder="Enter feedback or directives (optional)..."
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                />
+
+                <div className="flex gap-3 mt-4 justify-end">
+                  <button
+                    onClick={() => handleFeedback('approve')}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white font-medium transition-colors"
+                  >
+                    <CheckCircle2 className="w-4 h-4" /> Approve & Finish
+                  </button>
+
+                  <button
+                    onClick={() => handleFeedback('reject')}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors"
+                  >
+                    <Play className="w-4 h-4" /> Resume Execution
+                  </button>
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
 
@@ -188,7 +281,7 @@ export default function Home() {
                     <h2 className="text-2xl font-semibold text-white mb-1">Execution Plan</h2>
                     <p className="text-slate-400 text-sm">Version {result.final_plan.version} • Normalized Target</p>
                   </div>
-                  <div className="bg-green-500/10 text-green-400 px-3 py-1 rounded-full text-xs font-mono border border-green-500/20">
+                  <div className={`px-3 py-1 rounded-full text-xs font-mono border ${result.status === 'PAUSED' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse' : 'bg-green-500/10 text-green-400 border-green-500/20'}`}>
                     STATUS: {result.status}
                   </div>
                 </div>
@@ -253,6 +346,12 @@ export default function Home() {
                     <span className="text-slate-500">Drift Check</span>
                     <span className="text-green-400 font-mono">PASSED</span>
                   </div>
+                  {result.message && (
+                    <div className="py-2 border-b border-slate-800/50">
+                      <span className="text-slate-500 block mb-1">Last Message</span>
+                      <span className="text-slate-300 italic">&quot;{result.message}&quot;</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

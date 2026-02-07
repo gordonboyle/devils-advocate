@@ -19,7 +19,7 @@ def call_agent(
     user_input: str, 
     response_model: Type[T], 
     current_call_count: int,
-    model_name: str = "gpt-4o"
+    model_name: str = os.getenv("LITELLM_MODEL", "gpt-4o")
 ) -> T:
     """
     Calls the LLM with structured output enforcement (Pydantic).

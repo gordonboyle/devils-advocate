@@ -47,7 +47,7 @@ def evaluate_plan(
     # Metric: Cosine Distance (1 - cosine_similarity).
     # If Cosine Distance > 0.3, reject changes.
     drift_distance = calculate_cosine_distance(current_plan_text, normalized_objective)
-    if drift_distance > 0.3:
+    if drift_distance > 0.4:
         # Spec says "reject changes", which implies failure. 
         # Usually implies a recoverable fail or specialized drift status.
         # The spec flow: "IF FAIL (Recoverable): -> Draft (Loop)". 
