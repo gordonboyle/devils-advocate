@@ -10,27 +10,43 @@
   --da-red-dark: #dc2626;
   --da-red-bright: #f87171;
   --da-red-glow: rgba(239, 68, 68, 0.3);
-  
+
   /* Dark Backgrounds */
   --da-bg-deep: #0a0a0a;
-  --da-bg-card: #111111;
-  --da-bg-surface: #171717;
-  --da-bg-elevated: #1f1f1f;
-  
-  /* Grid & Accents */
-  --da-grid: rgba(239, 68, 68, 0.08);
-  --da-grid-accent: rgba(239, 68, 68, 0.15);
-  --da-border: rgba(239, 68, 68, 0.2);
-  --da-border-bright: rgba(239, 68, 68, 0.4);
-  
-  /* Text */
-  --da-text-primary: #ffffff;
-  --da-text-secondary: #a3a3a3;
-  --da-text-muted: #525252;
-  
-  /* Legacy vars */
-  --background: #0a0a0a;
-  --foreground: #ffffff;
+  --background: 5 5 5;
+  /* #050505 Near Black */
+  --foreground: 255 255 255;
+
+  --card: 10 10 10;
+  /* #0a0a0a Darker Grey */
+  --card-foreground: 255 255 255;
+
+  --popover: 10 10 10;
+  --popover-foreground: 255 255 255;
+
+  --primary: 239 68 68;
+  /* #ef4444 Tactical Red */
+  --primary-foreground: 255 255 255;
+
+  --secondary: 38 38 38;
+  /* #262626 Subtle Grey */
+  --secondary-foreground: 255 255 255;
+
+  --muted: 115 115 115;
+  /* #737373 Neutral Grey */
+  --muted-foreground: 163 163 163;
+
+  --accent: 239 68 68;
+  --accent-foreground: 255 255 255;
+
+  --destructive: 127 29 29;
+  --destructive-foreground: 255 255 255;
+
+  --border: 38 38 38;
+  --input: 38 38 38;
+  --ring: 239 68 68;
+
+  --radius: 0.5rem;
 }
 
 @theme inline {
@@ -38,12 +54,11 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  
+
   /* Add custom colors to Tailwind */
   --color-da-red: var(--da-red);
   --color-da-bg-deep: var(--da-bg-deep);
   --color-da-bg-card: var(--da-bg-card);
-  --color-da-bg-surface: var(--da-bg-surface);
 }
 
 body {
@@ -56,14 +71,14 @@ body {
    Tactical Grid Background
    ======================================== */
 .tactical-grid {
-  background-image: 
+  background-image:
     linear-gradient(to right, var(--da-grid) 1px, transparent 1px),
     linear-gradient(to bottom, var(--da-grid) 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
 .tactical-grid-accent {
-  background-image: 
+  background-image:
     linear-gradient(to right, var(--da-grid-accent) 1px, transparent 1px),
     linear-gradient(to bottom, var(--da-grid-accent) 1px, transparent 1px);
   background-size: 40px 40px;
@@ -73,14 +88,14 @@ body {
    Red Glow Effects
    ======================================== */
 .glow-red {
-  box-shadow: 
+  box-shadow:
     0 0 20px var(--da-red-glow),
     0 0 40px rgba(239, 68, 68, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .glow-red-intense {
-  box-shadow: 
+  box-shadow:
     0 0 30px var(--da-red-glow),
     0 0 60px rgba(239, 68, 68, 0.2),
     0 0 100px rgba(239, 68, 68, 0.1);
@@ -101,7 +116,7 @@ body {
 
 .input-tactical:focus {
   border-color: var(--da-red);
-  box-shadow: 
+  box-shadow:
     0 0 0 3px rgba(239, 68, 68, 0.1),
     0 0 20px rgba(239, 68, 68, 0.2);
   outline: none;
@@ -113,7 +128,7 @@ body {
 .btn-tactical {
   background: linear-gradient(180deg, var(--da-red) 0%, var(--da-red-dark) 100%);
   border: 1px solid var(--da-red-bright);
-  box-shadow: 
+  box-shadow:
     0 4px 15px rgba(239, 68, 68, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
   transition: all 0.2s ease;
@@ -121,7 +136,7 @@ body {
 
 .btn-tactical:hover {
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 6px 25px rgba(239, 68, 68, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
@@ -148,19 +163,27 @@ body {
    Animations
    ======================================== */
 @keyframes pulse-red {
-  0%, 100% { 
+
+  0%,
+  100% {
     opacity: 1;
     box-shadow: 0 0 20px var(--da-red-glow);
   }
-  50% { 
+
+  50% {
     opacity: 0.8;
     box-shadow: 0 0 40px var(--da-red-glow);
   }
 }
 
 @keyframes scan-line {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
+  0% {
+    transform: translateY(-100%);
+  }
+
+  100% {
+    transform: translateY(100vh);
+  }
 }
 
 .animate-pulse-red {

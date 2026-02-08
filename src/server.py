@@ -262,4 +262,4 @@ async def provide_feedback(request: FeedbackRequest):
 
 # --- 4. Execution Entry Point ---
 if __name__ == "__main__":
-    uvicorn.run("src.server:api_server", host="0.0.0.0", port=8010, reload=True)
+    uvicorn.run("src.server:api_server", host="0.0.0.0", port=8005, reload=True)

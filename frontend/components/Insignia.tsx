@@ -22,7 +22,7 @@ export function Insignia({ className = "w-20 h-20" }: InsigniaProps) {
                 src="/images/insignia_v2.png"
                 alt="Devil's Advocate Insignia"
                 fill
-                className="object-contain"
+                className="object-contain fill-current stroke-current stroke-1"
                 priority
                 unoptimized
             />
@@ -38,7 +38,7 @@ export function InsigniaFallback({ className = "w-20 h-20" }: InsigniaProps) {
     return (
         <svg
             viewBox="0 0 100 100"
-            className={className}
+            className={`${className} fill-current stroke-current stroke-1`}
             xmlns="http://www.w3.org/2000/svg"
         >
             <defs>

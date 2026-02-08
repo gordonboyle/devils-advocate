@@ -395,10 +395,12 @@ workflow.add_node("synthesize", synthesize_node)
 workflow.add_node("gatekeeper", gatekeeper_node)
 
 # Entry point is now Interrogator (asks questions first)
-workflow.set_entry_point("interrogator")
+# TEMPORARY BYPASS: Set entry point to draft to bypass the infinite interrogation loop for now.
+# workflow.set_entry_point("interrogator")
+workflow.set_entry_point("draft")
 
 # Interrogator -> Draft (after questions are answered)
-workflow.add_edge("interrogator", "draft")
+# workflow.add_edge("interrogator", "draft")
 
 # Rest of the flow remains the same
 workflow.add_edge("draft", "critique")
