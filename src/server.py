@@ -2,9 +2,12 @@ import sys
 import os
 import uvicorn
 import uuid
+import signal
+import atexit
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-# Load env vars immediatey
+# Load env vars immediately
 load_dotenv()
 
 from fastapi import FastAPI, HTTPException
@@ -25,10 +28,24 @@ from src.graph import workflow, ProjectPlan
 # Let's import 'app' from src.graph which now has the checkpointer.
 from src.graph import app as app_graph
 
+# LangGraph Command for resuming from interrupts (v5.1)
+from langgraph.types import Command
+
+# --- Lifespan Manager for Clean Startup/Shutdown ---
+@asynccontextmanager
+async def lifespan(app):
+    """Handle server startup and shutdown events."""
+    print("Devils Advocate API starting up...")
+    print(f"   PID: {os.getpid()}")
+    yield
+    print("Devils Advocate API shutting down...")
+    print("   Cleanup complete.")
+
 api_server = FastAPI(
     title="Devils Advocate API",
     description="Deterministic AI Planning Engine with Adversarial Critique",
-    version="4.3"
+    version="5.1",
+    lifespan=lifespan
 )
 
 # Enable CORS for Frontend Development (Port 3005)
@@ -50,13 +67,18 @@ class FeedbackRequest(BaseModel):
     action: str # "approve" | "reject" | "feedback"
     feedback_text: Optional[str] = None
 
+class AnswerRequest(BaseModel):
+    """Request to answer Interrogator's clarifying questions."""
+    answers: str  # User's answers as free-form text
+
 class PlanResponse(BaseModel):
     thread_id: str
     final_plan: Optional[Dict[str, Any]]
     iteration_count: int
     status: str
     message: Optional[str] = None
-    next_node: Optional[str] = None # To indicate if we are Paused at "human_reaction"
+    next_node: Optional[str] = None # To indicate if we are Paused
+    questions: Optional[List[str]] = None  # Interrogator questions (v5.1)
 
 # --- 3. Endpoints ---
 @api_server.get("/health")
@@ -83,18 +105,86 @@ async def start_plan(request: InitRequest):
         "devil_advocate_triggered": False,
         "status": "START",
         "critiques": [],
-        "plan": None
+        "plan": None,
+        "feedback_loop_count": 0,
+        # Interrogator fields (v5.1)
+        "interrogator_questions": None,
+        "user_answers": None,
+        "combined_context": None
     }
     
     try:
         # LangGraph invoke with config for thread ID
-        # Since we have interrupt_before=["human_reaction"], it will stop there.
-        # We need to loop or just return the stopped state.
-        
-        # We use stream or invoke. Invoke will run until interrupt.
+        # Invoke will run until an interrupt() is called or graph completes
         final_state = app_graph.invoke(initial_state, config=config)
         
-        # Check if we are interrupted
+        # Check if we are interrupted (Interrogator or Human Review)
+        snapshot = app_graph.get_state(config)
+        next_steps = snapshot.next if snapshot.next else []
+        
+        # Extract interrupt payload if present (contains questions from Interrogator)
+        interrupt_payload = None
+        if snapshot.tasks and len(snapshot.tasks) > 0:
+            task = snapshot.tasks[0]
+            if hasattr(task, 'interrupts') and task.interrupts:
+                interrupt_payload = task.interrupts[0].value
+        
+        # Determine status based on interrupt state
+        if next_steps:
+            # Check if this is an Interrogator interrupt (has questions)
+            if interrupt_payload and "questions" in interrupt_payload:
+                status = "INTERRUPTED"
+                questions = interrupt_payload["questions"]
+            else:
+                status = "PAUSED"  # Human review interrupt
+                questions = None
+        else:
+            status = final_state.get("status", "COMPLETED")
+            questions = None
+        
+        plan_obj = final_state.get("plan")
+        final_plan_dict = plan_obj.model_dump() if plan_obj else None
+        
+        return PlanResponse(
+            thread_id=thread_id,
+            final_plan=final_plan_dict,
+            iteration_count=final_state.get("iteration", 0),
+            status=status,
+            next_node=next_steps[0] if next_steps else None,
+            questions=questions
+        )
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Server Error during execution: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_server.post("/plan/{thread_id}/answer", response_model=PlanResponse)
+async def answer_questions(thread_id: str, request: AnswerRequest):
+    """
+    Answer the Interrogator's clarifying questions (v5.1).
+    
+    Uses LangGraph's Command(resume=...) to unpause the graph and feed
+    the user's answers back into the Interrogator node, which then
+    builds combined_context and passes it to the Draft node.
+    """
+    config = {"configurable": {"thread_id": thread_id}}
+    
+    # Check current state - should be paused at interrogator
+    snapshot = app_graph.get_state(config)
+    if not snapshot.next:
+        raise HTTPException(status_code=400, detail="Thread is not in a paused state.")
+    
+    # Resume execution with Command(resume=answers)
+    # This passes the answers directly to the interrupt() call in interrogator_node
+    try:
+        final_state = app_graph.invoke(
+            Command(resume=request.answers), 
+            config=config
+        )
+        
+        # Check if we hit another interrupt (human_reaction)
         snapshot = app_graph.get_state(config)
         next_steps = snapshot.next if snapshot.next else []
         status = "PAUSED" if next_steps else final_state.get("status", "COMPLETED")
@@ -107,11 +197,15 @@ async def start_plan(request: InitRequest):
             final_plan=final_plan_dict,
             iteration_count=final_state.get("iteration", 0),
             status=status,
-            next_node=next_steps[0] if next_steps else None
+            next_node=next_steps[0] if next_steps else None,
+            questions=None  # Questions already answered
         )
-
+        
     except Exception as e:
-        print(f"Server Error during execution: {e}")
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Server Error during answer processing: {e}")
+        print(error_trace)
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_server.post("/feedback", response_model=PlanResponse)
@@ -152,10 +246,20 @@ async def provide_feedback(request: FeedbackRequest):
             status=final_state.get("status", "COMPLETED")
         )
     except Exception as e:
+         import traceback
+         error_trace = traceback.format_exc()
          print(f"Server Error during resume: {e}")
+         print(error_trace)
+         
+         # Write to error log file for debugging
+         with open("server_error.log", "a") as f:
+             f.write(f"\n--- Error at {str(uuid.uuid4())} ---\n")
+             f.write(error_trace)
+             f.write("\n--------------------------------\n")
+             
          raise HTTPException(status_code=500, detail=str(e))
 
 
 # --- 4. Execution Entry Point ---
 if __name__ == "__main__":
-    uvicorn.run("src.server:api_server", host="0.0.0.0", port=8005, reload=True)
+    uvicorn.run("src.server:api_server", host="0.0.0.0", port=8010, reload=True)

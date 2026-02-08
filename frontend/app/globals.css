@@ -1,8 +1,36 @@
 @import "tailwindcss";
 
+/* ========================================
+   Devils Advocate - Tactical Red Theme v5.1
+   ======================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Core Colors */
+  --da-red: #ef4444;
+  --da-red-dark: #dc2626;
+  --da-red-bright: #f87171;
+  --da-red-glow: rgba(239, 68, 68, 0.3);
+  
+  /* Dark Backgrounds */
+  --da-bg-deep: #0a0a0a;
+  --da-bg-card: #111111;
+  --da-bg-surface: #171717;
+  --da-bg-elevated: #1f1f1f;
+  
+  /* Grid & Accents */
+  --da-grid: rgba(239, 68, 68, 0.08);
+  --da-grid-accent: rgba(239, 68, 68, 0.15);
+  --da-border: rgba(239, 68, 68, 0.2);
+  --da-border-bright: rgba(239, 68, 68, 0.4);
+  
+  /* Text */
+  --da-text-primary: #ffffff;
+  --da-text-secondary: #a3a3a3;
+  --da-text-muted: #525252;
+  
+  /* Legacy vars */
+  --background: #0a0a0a;
+  --foreground: #ffffff;
 }
 
 @theme inline {
@@ -10,17 +38,160 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  
+  /* Add custom colors to Tailwind */
+  --color-da-red: var(--da-red);
+  --color-da-bg-deep: var(--da-bg-deep);
+  --color-da-bg-card: var(--da-bg-card);
+  --color-da-bg-surface: var(--da-bg-surface);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--da-bg-deep);
+  color: var(--da-text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ========================================
+   Tactical Grid Background
+   ======================================== */
+.tactical-grid {
+  background-image: 
+    linear-gradient(to right, var(--da-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--da-grid) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.tactical-grid-accent {
+  background-image: 
+    linear-gradient(to right, var(--da-grid-accent) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--da-grid-accent) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ========================================
+   Red Glow Effects
+   ======================================== */
+.glow-red {
+  box-shadow: 
+    0 0 20px var(--da-red-glow),
+    0 0 40px rgba(239, 68, 68, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.glow-red-intense {
+  box-shadow: 
+    0 0 30px var(--da-red-glow),
+    0 0 60px rgba(239, 68, 68, 0.2),
+    0 0 100px rgba(239, 68, 68, 0.1);
+}
+
+.text-glow-red {
+  text-shadow: 0 0 40px var(--da-red-glow);
+}
+
+/* ========================================
+   Input Focus Styles
+   ======================================== */
+.input-tactical {
+  background: var(--da-bg-card);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  transition: all 0.3s ease;
+}
+
+.input-tactical:focus {
+  border-color: var(--da-red);
+  box-shadow: 
+    0 0 0 3px rgba(239, 68, 68, 0.1),
+    0 0 20px rgba(239, 68, 68, 0.2);
+  outline: none;
+}
+
+/* ========================================
+   Button Styles
+   ======================================== */
+.btn-tactical {
+  background: linear-gradient(180deg, var(--da-red) 0%, var(--da-red-dark) 100%);
+  border: 1px solid var(--da-red-bright);
+  box-shadow: 
+    0 4px 15px rgba(239, 68, 68, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: all 0.2s ease;
+}
+
+.btn-tactical:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 6px 25px rgba(239, 68, 68, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-tactical:active {
+  transform: translateY(0);
+}
+
+/* ========================================
+   Card Styles
+   ======================================== */
+.card-tactical {
+  background: var(--da-bg-card);
+  border: 1px solid var(--da-border);
+  border-radius: 12px;
+}
+
+.card-tactical-danger {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, var(--da-bg-card) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* ========================================
+   Animations
+   ======================================== */
+@keyframes pulse-red {
+  0%, 100% { 
+    opacity: 1;
+    box-shadow: 0 0 20px var(--da-red-glow);
+  }
+  50% { 
+    opacity: 0.8;
+    box-shadow: 0 0 40px var(--da-red-glow);
+  }
+}
+
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+.animate-pulse-red {
+  animation: pulse-red 2s ease-in-out infinite;
+}
+
+/* ========================================
+   Scrollbar Styling
+   ======================================== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--da-bg-deep);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--da-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--da-red);
+}
+
+/* ========================================
+   Selection Colors
+   ======================================== */
+::selection {
+  background: rgba(239, 68, 68, 0.3);
+  color: white;
 }

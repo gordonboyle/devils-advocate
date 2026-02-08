@@ -8,7 +8,7 @@ from litellm import completion
 T = TypeVar("T", bound=BaseModel)
 
 # Safety Constants
-MAX_TOTAL_CALLS = 15
+MAX_TOTAL_CALLS = 50
 
 class ResourceLimitExceeded(Exception):
     """Raised when the total compute cap is exceeded."""
